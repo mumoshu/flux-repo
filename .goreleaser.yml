@@ -1,0 +1,15 @@
+project_name: flux-repo
+builds:
+  - main: ./cmd/main
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/mumoshu/flux-repo/Version={{.Version}}
+changelog:
+  filters:
+    # commit messages matching the regexp listed here will be removed from
+    # the changelog
+    # Default is empty
+    exclude:
+      - '^docs:'
+      - typo
