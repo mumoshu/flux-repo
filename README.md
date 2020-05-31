@@ -24,16 +24,27 @@ Any [vals](https://github.com/variantdev/vals) backend like HashiCorp Vault or G
 
 ## Usage
 
-Writes secrets data to the AWS Secrets Manager secret at the path `foo/bar/flux-repo-TIME-ID/secrets.json` and modifies K8s secrets resources to NOT include data/stringData and have annotations with the references to written secrets data:
+### write
+
+- Reads secrets data from secrets in manifests under `inputdir`
+- Writes secrets data to the secrets store at the path `foo/bar`
+- Exports K8s secrets under `outdir`. Secret resources' `data` are replaced with `stringData` whose values are references, not their original secret values.
 
 ```
-kustomize build . | flux-repo write github.com/myorg/myconfig/sub --backend awssec://foo/bar path/to/dir
+$ kustomize build . > inputdir/all.yaml
+$ flux-repo write -b awssecrets -p foo/bar -f inputdir -o outdir
+$ ls outdir
+all.yaml
 ```
 
-Reads `secrets.json` from the AWS Secrets Manager secret at ``foo/bar/flux-repo-TIME-ID/secrets.json`, and transforms K8s secrets resources annotations to data/stringData, writes the resulting manifests to stdout:
+### read
+
+- Reads secret references from `foo/bar`
+- Reads manifests from `outdir`
+- Exports K8s resources to stdout. For each secret resource, references in `stringData` are replaced with their original values fetched from the secrets store
 
 ```
-flux-repo read . | kubectl apply -f -
+flux-repo read outdir | kubectl apply -f -
 ```
 
 For use with fluxd, add `flux-repo` binary to your custom fluxd container image, and create `.flux.yaml` in the repository root:
