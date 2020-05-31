@@ -37,6 +37,48 @@ $ ls outdir
 all.yaml
 ```
 
+Let's say `inputdir/all.yaml` was like:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+data:
+  foo: Rk9P
+  bar: QkFS
+```
+
+`outdir/all.yaml` would look like the below, which is safe to be committed into a git repo:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  foo: ref+awssecrets://foo/bar?version_id=B0FA5329-CD35-489E-A013-F3639346ACB0#/ns1/foo/foo
+  bar: ref+awssecrets://foo/bar?version_id=B0FA5329-CD35-489E-A013-F3639346ACB0#/ns1/foo/bar
+```
+
+And the AWS Secrets Manager secret `foo/bar` would look like:
+
+```yaml
+$ aws secretsmanager get-secret-value --secret-id foo/bar --version-id B0FA5329-CD35-489E-A013-F3639346ACB0
+{
+    "ARN": "arn:aws:secretsmanager:us-east-2:ACCOUNT_ID:secret:foo/bar-IdH8XY",
+    "Name": "foo/bar",
+    "VersionId": "B0FA5329-CD35-489E-A013-F3639346ACB0",
+    "SecretString": "ns1:\n  foo:\n    bar: QkFS\n    foo: Rk9P\nns2:\n  bar:\n    bar: QkFS\n    foo: Rk9P\n",
+    "VersionStages": [
+        "AWSCURRENT"
+    ],
+    "CreatedDate": 1590913222.888
+}
+```
+
 ### read
 
 - Reads secret references from `foo/bar`
@@ -46,6 +88,34 @@ all.yaml
 ```
 flux-repo read outdir | kubectl apply -f -
 ```
+
+Let's say `outdir/all.yaml` was like:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  foo: ref+awssecrets://foo/bar?version_id=B0FA5329-CD35-489E-A013-F3639346ACB0#/ns1/foo/foo
+  bar: ref+awssecrets://foo/bar?version_id=B0FA5329-CD35-489E-A013-F3639346ACB0#/ns1/foo/bar
+```
+
+The output would look like:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+data:
+  foo: Rk9P
+  bar: QkFS
+```
+
+### With fluxd
 
 For use with fluxd, add `flux-repo` binary to your custom fluxd container image, and create `.flux.yaml` in the repository root:
 
