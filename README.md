@@ -30,6 +30,8 @@ Any [vals](https://github.com/variantdev/vals) backend like HashiCorp Vault or G
 - Writes secrets data to the secrets store at the path `foo/bar`
 - Exports K8s secrets under `outdir`. Secret resources' `data` are replaced with `stringData` whose values are references, not their original secret values.
 
+For each write under the same secrets store path, `flux-repo` creates a new secret version (search for `AWS Secrets Manager Secret Version` for e.g. AWS) rather than a brand-new secret, so that a lot of writes doesn't result in a lot of secrets store secrets and huge cost.
+
 ```
 $ kustomize build . > inputdir/all.yaml
 $ flux-repo write -b awssecrets -p foo/bar -f inputdir -o outdir
