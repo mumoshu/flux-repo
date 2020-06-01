@@ -629,6 +629,10 @@ github.com/ugorji/go/codec v0.0.0-20190204201341-e444a5086c43/go.mod h1:iT03XoTw
 github.com/urfave/cli v1.20.0/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/variantdev/vals v0.4.0 h1:O1O7/sWhlvozcY2DjZBzlE1notxwVo6UBT1+w7HsO/k=
 github.com/variantdev/vals v0.4.0/go.mod h1:28iJwAamsfHevGLXO7QKmVWmwa79xM06sRjw8eGY73U=
+github.com/variantdev/vals v0.5.0 h1:6YhwBCJR1QwAH4DdYrIvCec68K9dJ+3LrnXNiezNjtI=
+github.com/variantdev/vals v0.5.0/go.mod h1:28iJwAamsfHevGLXO7QKmVWmwa79xM06sRjw8eGY73U=
+github.com/variantdev/vals v0.5.1 h1:dm9nnGFYJ+ef7qDd+vF3q802cauOlLL8aaA1dCNQBuU=
+github.com/variantdev/vals v0.5.1/go.mod h1:28iJwAamsfHevGLXO7QKmVWmwa79xM06sRjw8eGY73U=
 github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2/go.mod h1:UETIi67q53MR2AWcXfiuqkDkRtnGDLqkBTpCHuJHxtU=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.etcd.io/bbolt v1.3.2 h1:Z/90sZLPOeCy2PwprqkFa25PdkusRzaj9P8zm/KNyvk=

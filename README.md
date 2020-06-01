@@ -24,7 +24,47 @@ Any [vals](https://github.com/variantdev/vals) backend like HashiCorp Vault or G
 
 ## Usage
 
+```hcl
+$ flux-repo -h
+Manage GitOps config repositories and secrets for Flux CD
+
+Usage:
+  flux-repo [command]
+Available Commands:
+  write		Produces sanitized Kubernetes manifests by extracting secrets data into a secrets store
+  read		Reads sanitized Kubernetes manifests and writes raw manifests for apply
+```
+
 ### write
+
+```
+flux-repo write -h
+Usage of write:
+  -b string
+    	The name of secret provider backend to use (default "awssecrets")
+  -f string
+    	YAML/JSON file or directory to be decoded (default "-")
+  -o string
+    	The output directory
+  -p string
+    	Path to the secret stored in the secrets store
+  -r string
+    	The config repo to be updated with the sanitized manifests
+  -vault-address string
+    	The address of Vault API server
+  -vault-approle-role-id string
+    	Vault role_id for "appauth" authentication. Used only when -vault-auth-method is "approle"
+  -vault-approle-secret-id string
+    	Vault secret_id for "appauth" authentication. Used only when -vault-auth-method is "approle"
+  -vault-auth-method string
+    	Auth method for Vault. Use "token" or "approle"
+  -vault-token-env string
+    	The name of envvar to obtain Vault token from (default "VAULT_TOKEN")
+  -vault-token-file string
+    	The Vault token file for authentication
+```
+
+This command:
 
 - Reads secrets data from secrets in manifests under `inputdir`
 - Writes secrets data to the secrets store at the path `foo/bar`
@@ -129,3 +169,113 @@ patchUpdated:
 ```
 
 This will let flux reads secrets references and generate manifests for K8s secrets, which is then consumed by Flux as usual.
+
+### Using Vault backend
+
+`flux-repo`'s Vault backend requires Vault `kv` backend version 2.
+
+So firstly enable the engine and mount it at e.g. the path `foo/bar`:
+
+```console
+$ vault secrets enable -version=2 -path foo/bar kv
+Success! Enabled the kv secrets engine at: foo/bar/
+
+$ vault secrets list
+Path          Type         Accessor              Description
+----          ----         --------              -----------
+cubbyhole/    cubbyhole    cubbyhole_54b5eee1    per-token private secret storage
+foo/bar/      kv           kv_9bbb11af           n/a
+identity/     identity     identity_b092c94f     identity store
+kv/           kv           kv_385e23c8           n/a
+secret/       kv           kv_0e27a405           key/value secret storage
+sys/          system       system_4559871c       system endpoints used for control, policy and debugging
+```
+
+The path `foo/bar` becomes the prefix of `-p` in `flux-repo write` so that a write would be run like:
+
+```console
+$ flux-repo write -p foo/bar/data/baz -b vault -f examples/simple/in -o examples/simple/out/vault
+```
+
+Please note that `data` in `foo/bar/data/baz` is required for `kv` backend v2.
+
+You can verify the necessity of `data` in the path by running `vault kv -output-curl-string` like:
+
+```
+$ vault kv put -output-curl-string foo/bar/baz somekey=somevalue
+curl -X PUT -H "X-Vault-Token: $(vault print token)" -d '{"data":{"somekey":"somevalue"},"options":{}}' http://127.0.0.1:8200/v1/foo/bar/data/baz
+```
+
+The previous `flux-repo write` produces YAML files under `examples/simple/out/vault` as specified by the `-o` flag.
+
+Those YAML files would look like below:
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  # printf FOO | base64
+  foo: ref+vault://foo/bar/data/baz?version=1#/ns1/foo/foo
+  # printf BAR | base64
+  bar: ref+vault://foo/bar/data/baz?version=1#/ns1/foo/bar
+```
+
+As you can see in the `ref+` urls, secrets' data fields are stored within the secret at `foo/bar/data/baz`.
+
+You can verify the content of secrets' data by runnign `vault kv get`:
+
+```
+$ vault kv get -format json -version 10 foo/bar/baz
+{
+  "request_id": "3d84ad3d-2aa9-8d96-db2f-89a42193f663",
+  "lease_id": "",
+  "lease_duration": 0,
+  "renewable": false,
+  "data": {
+    "data": {
+      "ns1": {
+        "foo": {
+          "bar": "BAR",
+          "foo": "FOO"
+        }
+      },
+      "ns2": {
+        "bar": {
+          "bar": "BAR",
+          "foo": "FOO"
+        }
+      }
+    },
+    "metadata": {
+      "created_time": "2020-06-01T12:14:41.394053Z",
+      "deletion_time": "",
+      "destroyed": false,
+      "version": 13
+    }
+  },
+  "warnings": null
+}
+```
+
+Please note that other K8s resources like Deployment, Pod, Job and so on are exported as-is.
+
+To restore the secrets, run `flux-repo read` like:
+
+```
+$ flux-repo examples/simple/out/vault
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  # printf FOO | base64
+  foo: FOO
+  # printf BAR | base64
+  bar: BAR
+---
+# other files
+```
