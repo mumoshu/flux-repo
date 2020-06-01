@@ -114,7 +114,7 @@ $ aws secretsmanager get-secret-value --secret-id foo/bar --version-id B0FA5329-
     "ARN": "arn:aws:secretsmanager:us-east-2:ACCOUNT_ID:secret:foo/bar-IdH8XY",
     "Name": "foo/bar",
     "VersionId": "B0FA5329-CD35-489E-A013-F3639346ACB0",
-    "SecretString": "ns1:\n  foo:\n    bar: QkFS\n    foo: Rk9P\nns2:\n  bar:\n    bar: QkFS\n    foo: Rk9P\n",
+    "SecretString": "ns1:\n  foo:\n    bar: BAR\n    foo: FOO\nns2:\n  bar:\n    bar: BAR\n    foo: FOO\n",
     "VersionStages": [
         "AWSCURRENT"
     ],
@@ -153,9 +153,9 @@ kind: Secret
 metadata:
   namespace: ns1
   name: foo
-data:
-  foo: Rk9P
-  bar: QkFS
+stringData:
+  foo: FOO
+  bar: BAR
 ```
 
 ### With fluxd
