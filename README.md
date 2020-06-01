@@ -19,8 +19,9 @@ You won't like to invent it yourself, so here's the one created for you!
 ## Supported Backends
 
 - AWS SecretsManager
+- Vault (kv v2)
 
-Any [vals](https://github.com/variantdev/vals) backend like HashiCorp Vault or GCP secrets can be easily ported to this project. Please feel free to submit a feature request if you want this project to suppory additional backends.
+Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project. Please feel free to submit a feature/pull request if you want this project to suppory additional backends.
 
 ## Usage
 
