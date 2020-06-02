@@ -1,6 +1,7 @@
 project_name: flux-repo
 builds:
-  - main: ./cmd/main
+  - id: flux-repo
+    main: ./cmd/main
     env:
       - CGO_ENABLED=0
     ldflags:
@@ -13,3 +14,19 @@ changelog:
     exclude:
       - '^docs:'
       - typo
+dockers:
+  - goos: linux
+    goarch: amd64
+    goarm: ''
+    binaries:
+      - flux-repo
+    builds:
+      - flux-repo
+    image_templates:
+      - "mumoshu/flux-repo:latest"
+      - "mumoshu/flux-repo:{{ .Tag }}"
+      - "mumoshu/flux-repo:{{ .Tag }}-{{ .Env.FLUX_VERSION }}"
+      - "mumoshu/flux-repo:v{{ .Major }}"
+    build_flag_templates:
+      - "--pull"
+      - "--build-arg=FLUX_VERSION={{.Env.FLUX_VERSION}}"
