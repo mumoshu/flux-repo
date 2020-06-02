@@ -1,5 +1,7 @@
 # flux-repo
 
+[DockerHub](https://hub.docker.com/repository/docker/mumoshu/flux-repo/tags)
+
 `flux-repo` is a companion tool for https://github.com/fluxcd/flux that manages GitOps config repositories and secrets.
 
 The notable feature of it is to "transforming any secret contained in the Kubernetes manifests to references, and vice versa".
