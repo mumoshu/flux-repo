@@ -38,4 +38,3 @@ func (s *SecretProvider) GetRef(ns string, name string, dataKey string) (string,
 func (s *SecretProvider) Save() error {
 	return s.backend.Save(s.Secrets)
 }
-

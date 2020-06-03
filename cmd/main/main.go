@@ -4,8 +4,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/mumoshu/flux-repo/pkg/fluxrepo"
 	"os"
+
+	"github.com/mumoshu/flux-repo/pkg/fluxrepo"
 )
 
 func flagUsage() {
@@ -73,8 +74,14 @@ func main() {
 			fatal("%v", err)
 		}
 
-		if err := fluxrepo.Write(backend, outputDir, fsPath, secretPath); err != nil {
+		info, err := fluxrepo.Write(backend, outputDir, fsPath, secretPath)
+		if err != nil {
 			fatal("%v", err)
+		}
+
+		fmt.Printf("Wrote to %d\n", info.Dir)
+		if *outputDir == "" {
+			fmt.Println("Add command-line option `-o DIR` to change the output directory")
 		}
 	case CmdRead:
 		readCmd := flag.NewFlagSet(CmdRead, flag.ExitOnError)

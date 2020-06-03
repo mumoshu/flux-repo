@@ -3,20 +3,25 @@ package fluxrepo
 import (
 	"bufio"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	yaml "gopkg.in/yaml.v3"
 )
 
-func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, secretPath *string) error {
+type WriteInfo struct {
+	Dir string
+}
+
+func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, secretPath *string) (*WriteInfo, error) {
 	var dir string
 
 	if outputDir == nil || *outputDir == "" {
 		tmpfile, err := ioutil.TempFile("", "flux-repo-")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		tmpfile.Close()
 		os.Remove(tmpfile.Name())
@@ -27,12 +32,12 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+		return nil, err
 	}
 
 	yamlFiles, err := ReadYAMLFiles(*fsPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	secrets := &SecretProvider{
@@ -46,7 +51,7 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 			// Schedule all the secrets to be stored in the secrets store
 			n, err := SanitizeSecrets(secrets, node, true)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			res = append(res, *n)
 		}
@@ -54,7 +59,7 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 
 	// Actually store all the scheduled secrets and obtain the version id
 	if err := secrets.Save(); err != nil {
-		return err
+		return nil, err
 	}
 
 	for path, nodes := range yamlFiles {
@@ -63,7 +68,7 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 			// Replace secrets' data with references
 			n, err := SanitizeSecrets(secrets, node, false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			res = append(res, *n)
 		}
@@ -121,9 +126,9 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 		})()
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return &WriteInfo{Dir: dir}, nil
 }

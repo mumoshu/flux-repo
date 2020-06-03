@@ -3,11 +3,12 @@ package fluxrepo
 import (
 	"encoding/json"
 	"fmt"
-	vault "github.com/hashicorp/vault/api"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	vault "github.com/hashicorp/vault/api"
 )
 
 type VaultBackend struct {
@@ -57,7 +58,7 @@ func (s *VaultBackend) Save(sec map[string]map[string]Secret) error {
 		for k2, v2 := range v1 {
 			m2 := map[string]string{}
 			for k3, v3 := range v2 {
-				m2[k3]= v3
+				m2[k3] = v3
 			}
 			m1[k2] = m2
 		}

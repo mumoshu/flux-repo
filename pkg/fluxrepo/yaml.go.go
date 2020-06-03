@@ -3,10 +3,11 @@ package fluxrepo
 import (
 	"bufio"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"os"
 	"path/filepath"
+
+	yaml "gopkg.in/yaml.v3"
 )
 
 func ReadYAMLFiles(f string) (map[string][]yaml.Node, error) {

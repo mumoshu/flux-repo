@@ -3,10 +3,11 @@ package fluxrepo
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/variantdev/vals"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"strings"
+
+	"github.com/variantdev/vals"
+	yaml "gopkg.in/yaml.v3"
 )
 
 type Secret map[string]string
@@ -194,4 +195,3 @@ func SanitizeSecrets(secrets *SecretProvider, node yaml.Node, add bool) (*yaml.N
 
 	return &res, nil
 }
-

@@ -3,8 +3,9 @@ package fluxrepo
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/variantdev/vals"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 func Read(path string) error {
@@ -46,13 +47,12 @@ func Read(path string) error {
 			}
 		}
 
-		if fileIndex != len(yamlFiles) - 1 {
+		if fileIndex != len(yamlFiles)-1 {
 			fmt.Println("---")
 		}
 
-		fileIndex ++
+		fileIndex++
 	}
 
 	return nil
 }
-

@@ -1,5 +1,8 @@
 .PHONY: build
 build:
+	go fmt ./...
+	goimports -d .
+	goimports -w .
 	go build -o flux-repo ./cmd/main
 
 .PHONY: image
