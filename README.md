@@ -20,8 +20,9 @@ You won't like to invent it yourself, so here's the one created for you!
 
 ## Supported Backends
 
-- AWS SecretsManager
-- Vault (kv v2)
+- [AWS SecretsManager](#write)
+- [AWS SSM Parameter Store](#using-aws-ssm-parameter-store-backend)
+- [Vault (kv v2)](#using-vault-backend)
 
 Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project. Please feel free to submit a feature/pull request if you want this project to suppory additional backends.
 
@@ -39,6 +40,10 @@ Available Commands:
 ```
 
 ### write
+
+`flux-write` transforms the YAML and JSON files stored in the specified input directory so that the output does not contain sensitive texts and therefore safe to be git-commited.
+
+By default, `flux-write` uses AWS Secrets Manager as the backend to store the original secret values extracted from the input files.
 
 ```
 flux-repo write -h
@@ -172,6 +177,81 @@ patchUpdated:
 ```
 
 This will let flux reads secrets references and generate manifests for K8s secrets, which is then consumed by Flux as usual.
+
+### Using AWS SSM Parameter Store backend
+
+`flux-repo` supports AWS SSM Parameter Store as the backend.
+
+Let's say your Kubernetes maniefsts had an input file named `indir/example.yaml` which contains cleartext secret values:
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+data:
+  # printf FOO | base64
+  foo: Rk9P
+  # printf BAR | base64
+  bar: QkFS
+```
+
+You can run `flux-repo write -b awsssm` to produce a set of "sanitized" YAML files that are safe to be git-committed:
+
+```
+$ flux-repo write -p foo/bar/data/baz -b awsssm -f indir/ -o outdir/
+```
+
+```
+$ cat outdir/example.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  # printf FOO | base64
+  foo: ref+awsssm://foo/bar/data/baz?mode=singleparam&version=1#/ns1/foo/foo
+  # printf BAR | base64
+  bar: ref+awsssm://foo/bar/data/baz?mode=singleparam&version=1#/ns1/foo/bar
+```
+
+In the above example, the secret values for keys `foo` and `bar` are replaced with `ref+` URLs pointing to the original values saved in the backend (AWS SSM Parameter Store). The whole set of output YAML files does not contain secret values themselves, which means they're safe to be git-comm ited.
+
+You don't usually have to, but you're curious how it works, run e.g. awscli to see the original secret values that were extracted and save by `flux-repo write`:
+
+```
+$ aws ssm get-parameter --name /foo/bar/data/baz --with-decryption
+{
+    "Parameter": {
+        "Name": "/foo/bar/data/baz",
+        "Type": "SecureString",
+        "Value": "ns1:\n  foo:\n    bar: BAR\n    foo: FOO\n",
+        "Version": 1,
+        "LastModifiedDate": 1593750024.821,
+        "ARN": "arn:aws:ssm:us-east-2:YOUR_AWS_ACCOUNT_ID:parameter/foo/bar/data/baz"
+    }
+}
+
+$ aws ssm get-parameter --name /foo/bar/data/baz --with-decryption | jq -r .Parameter.Value
+ns1:
+  foo:
+    bar: BAR
+    foo: FOO
+``` 
+
+> JFYI, the parameter name passed to `get-parameter` command can be suffixed with a version number. As you can see from the `version=1` part of ref URLs, the version number is `1` for the above example. So the command can also be `aws ssm get-parameter --name /foo/bar/data/baz:1 --with-decryption`, with extra `:1` at the end of parameter name. 
+
+> `flux-repo` and SSM keeps the full history of parameter versions. You can review the history by running `aws ssm get-parameter-history --name /foo/bar/data/baz`.
+>
+> If you need to delete the full history, run `aws ssm delete-parameter --name /foo/bar/data/baz`. Unfortunately, there's no AWS API to delete a single version.
+
+Now, in your deployment pipeline, run `flux-repo read DIR` to read sanitized YAML files and the backend to recover the original YAML files, so that they can be deployed as usual:
+
+```
+$ flux-repo read outdir | kubectl apply -f -
+```
 
 ### Using Vault backend
 

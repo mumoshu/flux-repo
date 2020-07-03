@@ -44,12 +44,17 @@ func main() {
 	case CmdWrite:
 		var awsBackend fluxrepo.AWSSecretsBackend
 		var vaultBackend fluxrepo.VaultBackend
+		var awsSSMBackend fluxrepo.AWSSSMBackend
+		var awsOpts fluxrepo.AWSOptions
 
 		writeCmd := flag.NewFlagSet(CmdWrite, flag.ExitOnError)
 		secretPath := writeCmd.String("p", "", "Path to the secret stored in the secrets store")
 		fsPath := writeCmd.String("f", "-", "YAML/JSON file or directory to be decoded")
 		outputDir := writeCmd.String("o", "", "The output directory")
 		secretBackend := writeCmd.String("b", "awssecrets", "The name of secret provider backend to use")
+
+		writeCmd.StringVar(&awsOpts.Region, "aws-region", "", "AWS region to be used in aws-sdk")
+		writeCmd.StringVar(&awsOpts.Profile, "aws-profile", "", "AWS profile to be used in aws-sdk")
 
 		writeCmd.StringVar(&vaultBackend.AuthMethod, "vault-auth-method", "", "Auth method for Vault. Use \"token\" or \"approle\"")
 		writeCmd.StringVar(&vaultBackend.Address, "vault-address", "", "The address of Vault API server")
@@ -69,7 +74,7 @@ func main() {
 			fatal("%v", err)
 		}
 
-		backend, err := createBackend(secretBackend, &awsBackend, &vaultBackend, secretPath)
+		backend, err := createBackend(secretBackend, &awsOpts, &awsBackend, &awsSSMBackend, &vaultBackend, secretPath)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -79,7 +84,7 @@ func main() {
 			fatal("%v", err)
 		}
 
-		fmt.Printf("Wrote to %d\n", info.Dir)
+		fmt.Printf("Wrote to %s\n", info.Dir)
 		if *outputDir == "" {
 			fmt.Println("Add command-line option `-o DIR` to change the output directory")
 		}
@@ -105,7 +110,7 @@ func main() {
 	}
 }
 
-func createBackend(backendName *string, awsBackend *fluxrepo.AWSSecretsBackend, vaultBackend *fluxrepo.VaultBackend, secretPath *string) (fluxrepo.SecretProviderBackend, error) {
+func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, awsBackend *fluxrepo.AWSSecretsBackend, awsSSMBackend *fluxrepo.AWSSSMBackend, vaultBackend *fluxrepo.VaultBackend, secretPath *string) (fluxrepo.SecretProviderBackend, error) {
 
 	if secretPath == nil || *secretPath == "" {
 		return nil, errors.New("missing secret path")
@@ -115,8 +120,14 @@ func createBackend(backendName *string, awsBackend *fluxrepo.AWSSecretsBackend, 
 
 	if backendName == nil || *backendName == "awssecrets" {
 		awsBackend.Path = *secretPath
+		awsBackend.AWSOptions = *awsOpts
 
 		backend = awsBackend
+	} else if *backendName == "awsssm" {
+		awsSSMBackend.Path = *secretPath
+		awsSSMBackend.AWSOptions = *awsOpts
+
+		backend = awsSSMBackend
 	} else if *backendName == "vault" {
 		vaultBackend.Path = *secretPath
 

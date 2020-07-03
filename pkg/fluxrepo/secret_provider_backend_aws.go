@@ -13,6 +13,7 @@ import (
 type AWSSecretsBackend struct {
 	Path      string
 	VersionID string
+	AWSOptions
 }
 
 func (s *AWSSecretsBackend) FormatRef(ns, name, dataKey string) string {
@@ -20,7 +21,7 @@ func (s *AWSSecretsBackend) FormatRef(ns, name, dataKey string) string {
 }
 
 func (s *AWSSecretsBackend) Save(sec map[string]map[string]Secret) error {
-	m := secretsmanager.New(awsclicompat.NewSession(""))
+	m := secretsmanager.New(awsclicompat.NewSession(s.Region, s.Profile))
 
 	var buf bytes.Buffer
 
