@@ -22,6 +22,7 @@ You won't like to invent it yourself, so here's the one created for you!
 
 - [AWS SecretsManager](#write)
 - [AWS SSM Parameter Store](#using-aws-ssm-parameter-store-backend)
+- [AWS S3](#using-aws-s3-backend)
 - [Vault (kv v2)](#using-vault-backend)
 
 Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project.
@@ -218,7 +219,8 @@ stringData:
   bar: ref+awsssm://foo/bar/data/baz?mode=singleparam&version=1#/ns1/foo/bar
 ```
 
-In the above example, the secret values for keys `foo` and `bar` are replaced with `ref+` URLs pointing to the original values saved in the backend (AWS SSM Parameter Store). The whole set of output YAML files does not contain secret values themselves, which means they're safe to be git-comm ited.
+In the above example, the secret values for keys `foo` and `bar` are replaced with `ref+` URLs pointing to the original values saved in the backend, AWS SSM Parameter Store.
+The whole set of output YAML files does not contain secret values themselves, which means they're safe to be git-committed.
 
 You don't usually have to, but you're curious how it works, run e.g. awscli to see the original secret values that were extracted and save by `flux-repo write`:
 
@@ -247,6 +249,111 @@ ns1:
 > `flux-repo` and SSM keeps the full history of parameter versions. You can review the history by running `aws ssm get-parameter-history --name /foo/bar/data/baz`.
 >
 > If you need to delete the full history, run `aws ssm delete-parameter --name /foo/bar/data/baz`. Unfortunately, there's no AWS API to delete a single version.
+
+Now, in your deployment pipeline, run `flux-repo read DIR` to read sanitized YAML files and the backend to recover the original YAML files, so that they can be deployed as usual:
+
+```
+$ flux-repo read outdir | kubectl apply -f -
+```
+
+### Using AWS S3 backend
+
+`flux-repo` supports AWS S3 as the backend.
+
+Let's say your Kubernetes manifests had an input file named `indir/example.yaml` which contains cleartext secret values:
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+data:
+  # printf FOO | base64
+  foo: Rk9P
+  # printf BAR | base64
+  bar: QkFS
+```
+
+And you have a S3 bucket with object versioning enabled:
+
+```
+$ aws s3api create-bucket --bucket fluxrepotest --acl private --create-bucket-configuration LocationConstraint=us-east-2
+$ aws s3api put-bucket-versioning --bucket fluxrepotest --versioning-configuration Status=Enabled
+
+# Test that you have correct permissions to put/get/delete objects
+$ aws s3api put-object --bucket fluxrepotest --key test
+{
+    "ETag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "VersionId": "pqijjBuTHYyimutR9bKOVeXEG8A5KEf_"
+}
+$ aws s3api get-object --bucket fluxrepotest --key test --version-id pqijjBuTHYyimutR9bKOVeXEG8A5KEf_ outfile
+{
+    "AcceptRanges": "bytes",
+    "LastModified": "Sat, 18 Jul 2020 02:35:25 GMT",
+    "ContentLength": 0,
+    "ETag": "\"d41d8cd98f00b204e9800998ecf8427e\"",
+    "VersionId": "pqijjBuTHYyimutR9bKOVeXEG8A5KEf_",
+    "ContentType": "binary/octet-stream",
+    "Metadata": {}
+}
+$ aws s3api delete-object --bucket fluxrepotest --key test --version-id pqijjBuTHYyimutR9bKOVeXEG8A5KEf_
+{
+    "VersionId": "pqijjBuTHYyimutR9bKOVeXEG8A5KEf_"
+}
+```
+
+You can run `flux-repo write -b s3` to produce a set of "sanitized" YAML files that are safe to be git-committed:
+
+```
+$ flux-repo write -p foo/bar/data/baz -b s3 -f indir/ -o outdir/
+```
+
+```
+$ cat outdir/example.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  # printf FOO | base64
+  foo: ref+s3://foo/bar/data/baz&version=3yYji9YJgwgOMjGFlJR7JK338IMl9DFE#/ns1/foo/foo
+  # printf BAR | base64
+  bar: ref+s3://foo/bar/data/baz&version=3yYji9YJgwgOMjGFlJR7JK338IMl9DFE#/ns1/foo/bar
+```
+
+In the above example, the secret values for keys `foo` and `bar` are replaced with `ref+` URLs pointing to the original values saved in the backend, AWS S3.
+The whole set of output YAML files does not contain secret values themselves, which means they're safe to be git-committed.
+
+You don't usually have to, but if you're curious how it works, run e.g. awscli to see the original secret values that were extracted and save by `flux-repo write`:
+
+```
+$ aws s3api get-object --bucket foo --key bar/data/baz --version-id 3yYji9YJgwgOMjGFlJR7JK338IMl9DFE outfile
+{
+    "AcceptRanges": "bytes",
+    "LastModified": "Sat, 18 Jul 2020 02:55:05 GMT",
+    "ContentLength": 76,
+    "ETag": "\"a9be7779b54a7359af28973ed7ce751c\"",
+    "VersionId": "3yYji9YJgwgOMjGFlJR7JK338IMl9DFE",
+    "ContentType": "binary/octet-stream",
+    "Metadata": {}
+}
+
+$ cat outfile
+ns1:
+  foo:
+    bar: BAR
+    foo: FOO
+ns2:
+  bar:
+    bar: BAR
+    foo: FOO
+``` 
+
+> `flux-repo` and S3 keeps the historical versions of object versions. You can review the history by running `aws s3 list-object-versions --bucket foo --key bar/data/baz`.
+>
+> If you need to delete a single version, run `aws s3api delete-object --bucket foo --key bar/data/baz --version-id VERSION_ID`.
 
 Now, in your deployment pipeline, run `flux-repo read DIR` to read sanitized YAML files and the backend to recover the original YAML files, so that they can be deployed as usual:
 

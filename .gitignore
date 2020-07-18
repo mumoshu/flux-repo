@@ -1,3 +1,5 @@
 *~
 .idea
 flux-repo
+.vscode
+dist

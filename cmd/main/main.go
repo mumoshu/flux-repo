@@ -42,9 +42,7 @@ func main() {
 
 	switch os.Args[1] {
 	case CmdWrite:
-		var awsBackend fluxrepo.AWSSecretsBackend
-		var vaultBackend fluxrepo.VaultBackend
-		var awsSSMBackend fluxrepo.AWSSSMBackend
+		b := backends{}
 		var awsOpts fluxrepo.AWSOptions
 
 		writeCmd := flag.NewFlagSet(CmdWrite, flag.ExitOnError)
@@ -56,12 +54,12 @@ func main() {
 		writeCmd.StringVar(&awsOpts.Region, "aws-region", "", "AWS region to be used in aws-sdk")
 		writeCmd.StringVar(&awsOpts.Profile, "aws-profile", "", "AWS profile to be used in aws-sdk")
 
-		writeCmd.StringVar(&vaultBackend.AuthMethod, "vault-auth-method", "", "Auth method for Vault. Use \"token\" or \"approle\"")
-		writeCmd.StringVar(&vaultBackend.Address, "vault-address", "", "The address of Vault API server")
-		writeCmd.StringVar(&vaultBackend.TokenFile, "vault-token-file", "", "The Vault token file for authentication")
-		writeCmd.StringVar(&vaultBackend.TokenEnv, "vault-token-env", "VAULT_TOKEN", "The name of envvar to obtain Vault token from")
-		writeCmd.StringVar(&vaultBackend.RoleID, "vault-approle-role-id", "", "Vault role_id for \"appauth\" authentication. Used only when -vault-auth-method is \"approle\" ")
-		writeCmd.StringVar(&vaultBackend.SecretID, "vault-approle-secret-id", "", "Vault secret_id for \"appauth\" authentication. Used only when -vault-auth-method is \"approle\" ")
+		writeCmd.StringVar(&b.vault.AuthMethod, "vault-auth-method", "", "Auth method for Vault. Use \"token\" or \"approle\"")
+		writeCmd.StringVar(&b.vault.Address, "vault-address", "", "The address of Vault API server")
+		writeCmd.StringVar(&b.vault.TokenFile, "vault-token-file", "", "The Vault token file for authentication")
+		writeCmd.StringVar(&b.vault.TokenEnv, "vault-token-env", "VAULT_TOKEN", "The name of envvar to obtain Vault token from")
+		writeCmd.StringVar(&b.vault.RoleID, "vault-approle-role-id", "", "Vault role_id for \"appauth\" authentication. Used only when -vault-auth-method is \"approle\" ")
+		writeCmd.StringVar(&b.vault.SecretID, "vault-approle-secret-id", "", "Vault secret_id for \"appauth\" authentication. Used only when -vault-auth-method is \"approle\" ")
 
 		_ = writeCmd.String("r", "", "The config repo to be updated with the sanitized manifests")
 
@@ -74,7 +72,7 @@ func main() {
 			fatal("%v", err)
 		}
 
-		backend, err := createBackend(secretBackend, &awsOpts, &awsBackend, &awsSSMBackend, &vaultBackend, secretPath)
+		backend, err := createBackend(secretBackend, &awsOpts, b, secretPath)
 		if err != nil {
 			fatal("%v", err)
 		}
@@ -110,8 +108,14 @@ func main() {
 	}
 }
 
-func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, awsBackend *fluxrepo.AWSSecretsBackend, awsSSMBackend *fluxrepo.AWSSSMBackend, vaultBackend *fluxrepo.VaultBackend, secretPath *string) (fluxrepo.SecretProviderBackend, error) {
+type backends struct {
+	awsSecrets fluxrepo.AWSSecretsBackend
+	vault      fluxrepo.VaultBackend
+	ssm        fluxrepo.AWSSSMBackend
+	s3         fluxrepo.S3Backend
+}
 
+func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, backends backends, secretPath *string) (fluxrepo.SecretProviderBackend, error) {
 	if secretPath == nil || *secretPath == "" {
 		return nil, errors.New("missing secret path")
 	}
@@ -119,19 +123,32 @@ func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, awsBackend
 	var backend fluxrepo.SecretProviderBackend
 
 	if backendName == nil || *backendName == "awssecrets" {
+		awsBackend := backends.awsSecrets
+
 		awsBackend.Path = *secretPath
 		awsBackend.AWSOptions = *awsOpts
 
-		backend = awsBackend
+		backend = &awsBackend
 	} else if *backendName == "awsssm" {
+		awsSSMBackend := backends.ssm
+
 		awsSSMBackend.Path = *secretPath
 		awsSSMBackend.AWSOptions = *awsOpts
 
-		backend = awsSSMBackend
+		backend = &awsSSMBackend
+	} else if *backendName == "s3" || *backendName == "awss3" {
+		s3Backend := backends.s3
+
+		s3Backend.Key = *secretPath
+		s3Backend.AWSOptions = *awsOpts
+
+		backend = &s3Backend
 	} else if *backendName == "vault" {
+		vaultBackend := backends.vault
+
 		vaultBackend.Path = *secretPath
 
-		backend = vaultBackend
+		backend = &vaultBackend
 	} else {
 		return nil, fmt.Errorf("unsupported secret provider backend: %v", *backendName)
 	}
