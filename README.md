@@ -4,7 +4,7 @@
 
 `flux-repo` is a companion tool for https://github.com/fluxcd/flux that manages GitOps config repositories and secrets.
 
-The notable feature of it is to "transforming any secret contained in the Kubernetes manifests to references, and vice versa".
+The notable feature of it is to "transform any secret contained in the Kubernetes manifests to references, and vice versa".
 
 This is handy when you prefer NOT commiting encrypted secrets into the config repository and instead want to store secrets themselves into a secret manager, still leaving enough information on the commited manifests so that you can see if there are changes in secrets via git diff.
 
@@ -24,7 +24,8 @@ You won't like to invent it yourself, so here's the one created for you!
 - [AWS SSM Parameter Store](#using-aws-ssm-parameter-store-backend)
 - [Vault (kv v2)](#using-vault-backend)
 
-Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project. Please feel free to submit a feature/pull request if you want this project to suppory additional backends.
+Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project.
+Please feel free to submit a feature/pull request if you want this project to support additional backends.
 
 ## Usage
 
