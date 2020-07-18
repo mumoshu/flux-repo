@@ -23,6 +23,7 @@ You won't like to invent it yourself, so here's the one created for you!
 - [AWS SecretsManager](#write)
 - [AWS SSM Parameter Store](#using-aws-ssm-parameter-store-backend)
 - [AWS S3](#using-aws-s3-backend)
+- [SOPS (AWS KMS)](#using-sops-backend)
 - [Vault (kv v2)](#using-vault-backend)
 
 Any [vals](https://github.com/variantdev/vals) backend not listed here, like GCP secrets, can be easily ported to this project.
@@ -354,6 +355,84 @@ ns2:
 > `flux-repo` and S3 keeps the historical versions of object versions. You can review the history by running `aws s3 list-object-versions --bucket foo --key bar/data/baz`.
 >
 > If you need to delete a single version, run `aws s3api delete-object --bucket foo --key bar/data/baz --version-id VERSION_ID`.
+
+Now, in your deployment pipeline, run `flux-repo read DIR` to read sanitized YAML files and the backend to recover the original YAML files, so that they can be deployed as usual:
+
+```
+$ flux-repo read outdir | kubectl apply -f -
+```
+
+### Using SOPS backend
+
+`flux-repo` supports [mozilla/sops](https://github.com/mozilla/sops) with AWS KMS as the backend.
+
+Let's say your Kubernetes manifests had an input file named `indir/example.yaml` which contains cleartext secret values:
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+data:
+  # printf FOO | base64
+  foo: Rk9P
+  # printf BAR | base64
+  bar: QkFS
+```
+
+And you have a AWS KMS master key that is usable with `sops`:
+
+```
+$ cat cleartext.yaml
+  foo: FOO
+  bar: BAR
+
+$ export SOPS_KMS_ARN=arn:aws:kms:us-east-2:ACCOUNT_ID:key/c57a1f83-1d44-4017-83ee-300699963967
+$ sops -e cleartext.yaml > cleartext.yaml.enc
+
+$ sops -d --input-type yaml --output-type yaml cleartext.yaml.enc
+  foo: FOO
+  bar: BAR
+```
+
+You can run `flux-repo write -b sops` to produce a set of "sanitized" YAML files that are safe to be git-committed:
+
+```
+$ flux-repo write -p outdir/secrets.enc -b sops -f indir/ -o outdir/
+```
+
+```
+$ cat outdir/example.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: ns1
+  name: foo
+stringData:
+  # printf FOO | base64
+  foo: ref+sops://outdir/secrets.enc#/ns1/foo/foo
+  # printf BAR | base64
+  bar: ref+sops://outdir/secrets.enc#/ns1/foo/bar
+```
+
+Please note that, as you've specified `-p outdir/secrets.enc`, the secret values for keys `foo` and `bar` are saved to `outdir/secrets.enc` and their occurrences are replaced with `ref+` URLs pointing to the values saved in the encrypted file.
+
+The whole set of output YAML files does not contain cleartext secret values, they're now safe to be git-committed.
+
+If you're curious how it works, run `sops -d` to see the original secret values that were extracted and save by `flux-repo write`:
+
+```
+$ sops -d --input-type yaml --output-type yaml outdir/secrets.enc
+ns1:
+  foo:
+    bar: BAR
+    foo: FOO
+ns2:
+  bar:
+    bar: BAR
+    foo: FOO
+```
 
 Now, in your deployment pipeline, run `flux-repo read DIR` to read sanitized YAML files and the backend to recover the original YAML files, so that they can be deployed as usual:
 

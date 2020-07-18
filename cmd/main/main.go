@@ -54,6 +54,9 @@ func main() {
 		writeCmd.StringVar(&awsOpts.Region, "aws-region", "", "AWS region to be used in aws-sdk")
 		writeCmd.StringVar(&awsOpts.Profile, "aws-profile", "", "AWS profile to be used in aws-sdk")
 
+		writeCmd.StringVar(&b.sops.KMSKeyARN, "aws-kms-key-arn", "", "Comma-separated list of KMS Key ARNs to the list of master keys on the given file")
+		writeCmd.StringVar(&b.sops.EncryptionContext, "aws-kms-encryption-context", "", "Comma-separated list of KMS encryption context key:value pairs")
+
 		writeCmd.StringVar(&b.vault.AuthMethod, "vault-auth-method", "", "Auth method for Vault. Use \"token\" or \"approle\"")
 		writeCmd.StringVar(&b.vault.Address, "vault-address", "", "The address of Vault API server")
 		writeCmd.StringVar(&b.vault.TokenFile, "vault-token-file", "", "The Vault token file for authentication")
@@ -113,6 +116,7 @@ type backends struct {
 	vault      fluxrepo.VaultBackend
 	ssm        fluxrepo.AWSSSMBackend
 	s3         fluxrepo.S3Backend
+	sops       fluxrepo.SOPSBackend
 }
 
 func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, backends backends, secretPath *string) (fluxrepo.SecretProviderBackend, error) {
@@ -143,6 +147,17 @@ func createBackend(backendName *string, awsOpts *fluxrepo.AWSOptions, backends b
 		s3Backend.AWSOptions = *awsOpts
 
 		backend = &s3Backend
+	} else if *backendName == "sops" {
+		sopsBackend := backends.sops
+
+		sopsBackend.FilePath = *secretPath
+		sopsBackend.AWSOptions = *awsOpts
+
+		if err := sopsBackend.Validate(); err != nil {
+			return nil, err
+		}
+
+		backend = &sopsBackend
 	} else if *backendName == "vault" {
 		vaultBackend := backends.vault
 

@@ -3,6 +3,7 @@ package fluxrepo
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 
 	"github.com/variantdev/vals"
 	yaml "gopkg.in/yaml.v3"
@@ -21,7 +22,13 @@ func Read(path string) error {
 
 	var fileIndex int
 
-	for _, nodes := range yamlFiles {
+	for path, nodes := range yamlFiles {
+		// For sops backend, the user may have saved the encrypted file under the same directory as the target files
+		// If we didn't skip the encrypted file, it is emitted as-is, which breaks e.g. `flux-repo read | kubectl apply -f -`.
+		if filepath.Ext(path) == ".enc" {
+			continue
+		}
+
 		var res []yaml.Node
 		for _, node := range nodes {
 			n, err := RestoreSecrets(runtime, node)
