@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/mumoshu/flux-repo/pkg/encrypt"
 	"os"
 
 	"github.com/mumoshu/flux-repo/pkg/fluxrepo"
@@ -51,6 +52,8 @@ func main() {
 		outputDir := writeCmd.String("o", "", "The output directory")
 		secretBackend := writeCmd.String("b", "awssecrets", "The name of secret provider backend to use")
 
+		doEncrypt := writeCmd.Bool("encrypt", false, "Encrypt files instead of replacing secret values with refs")
+
 		writeCmd.StringVar(&awsOpts.Region, "aws-region", "", "AWS region to be used in aws-sdk")
 		writeCmd.StringVar(&awsOpts.Profile, "aws-profile", "", "AWS profile to be used in aws-sdk")
 
@@ -75,14 +78,32 @@ func main() {
 			fatal("%v", err)
 		}
 
-		backend, err := createBackend(secretBackend, &awsOpts, b, secretPath)
-		if err != nil {
-			fatal("%v", err)
-		}
+		var info *fluxrepo.WriteInfo
 
-		info, err := fluxrepo.Write(backend, outputDir, fsPath, secretPath)
-		if err != nil {
-			fatal("%v", err)
+		if *doEncrypt {
+			sop := &encrypt.Sops{
+				KMS:               b.sops.KMSKeyARN,
+				EncryptionContext: b.sops.EncryptionContext,
+				AWSProfile:        b.sops.Profile,
+			}
+
+			var err error
+
+			sop.EncryptedRegex = "^(data|stringData)$"
+			info, err = fluxrepo.FilterWithSops(sop, outputDir, fsPath)
+			if err != nil {
+				fatal("%v", err)
+			}
+		} else {
+			backend, err := createBackend(secretBackend, &awsOpts, b, secretPath)
+			if err != nil {
+				fatal("%v", err)
+			}
+
+			info, err = fluxrepo.Write(backend, outputDir, fsPath)
+			if err != nil {
+				fatal("%v", err)
+			}
 		}
 
 		fmt.Printf("Wrote to %s\n", info.Dir)

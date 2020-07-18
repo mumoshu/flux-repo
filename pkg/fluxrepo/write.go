@@ -2,7 +2,9 @@ package fluxrepo
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/mumoshu/flux-repo/pkg/encrypt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,13 +17,84 @@ type WriteInfo struct {
 	Dir string
 }
 
-func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, secretPath *string) (*WriteInfo, error) {
+func FilterWithSops(sop *encrypt.Sops, outputDir *string, fsPath *string) (*WriteInfo, error) {
+	dir, err := fallbackToTempDir(outputDir)
+	if err != nil {
+		return nil, err
+	}
+
+	yamlFiles, err := FindFiles(*fsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, path := range yamlFiles {
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("opening file %s: %w", file, err)
+		}
+
+		fileContent, err := ioutil.ReadAll(file)
+		if err != nil {
+			return nil, fmt.Errorf("reading file %s: %w", path, err)
+		}
+
+		dec := yaml.NewDecoder(bytes.NewReader(fileContent))
+		type objectMeta struct {
+			Kind string `yaml:"kind"`
+		}
+
+		var objMeta objectMeta
+		if err := dec.Decode(&objMeta); err != nil {
+			return nil, fmt.Errorf("decoding yaml file %s: %w", path, err)
+		}
+
+		var data []byte
+
+		if objMeta.Kind != "Secret" {
+			data = fileContent
+		} else {
+			enc, err := sop.Data(path, fileContent, strings.TrimPrefix(filepath.Ext(path), "."))
+			if err != nil {
+				return nil, fmt.Errorf("encryptiong %s: %w", path, err)
+			}
+
+			data = enc
+		}
+
+		var relpath string
+		if path != *fsPath {
+			relpath = strings.TrimPrefix(path, *fsPath)
+		} else {
+			relpath = path
+		}
+
+		dest := filepath.Join(dir, relpath)
+
+		destDir := filepath.Dir(dest)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
+			return nil, fmt.Errorf("creating directory %s: %w", destDir, err)
+		}
+
+		if err := ioutil.WriteFile(dest, data, 0644); err != nil {
+			return nil, fmt.Errorf("writing file %s: %w", dest, err)
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("writing file to %s: %w", dest, err)
+		}
+	}
+
+	return &WriteInfo{Dir: dir}, nil
+}
+
+func fallbackToTempDir(outputDir *string) (string, error) {
 	var dir string
 
 	if outputDir == nil || *outputDir == "" {
 		tmpfile, err := ioutil.TempFile("", "flux-repo-")
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 		tmpfile.Close()
 		os.Remove(tmpfile.Name())
@@ -32,6 +105,15 @@ func Write(backend SecretProviderBackend, outputDir *string, fsPath *string, sec
 	}
 
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+
+	return dir, nil
+}
+
+func Write(backend SecretProviderBackend, outputDir *string, fsPath *string) (*WriteInfo, error) {
+	dir, err := fallbackToTempDir(outputDir)
+	if err != nil {
 		return nil, err
 	}
 

@@ -10,7 +10,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-func ReadYAMLFiles(f string) (map[string][]yaml.Node, error) {
+func FindFiles(f string) ([]string, error) {
 	var files []string
 
 	stat, err := os.Stat(f)
@@ -27,6 +27,15 @@ func ReadYAMLFiles(f string) (map[string][]yaml.Node, error) {
 		files = append(files, matches...)
 	} else {
 		files = append(files, f)
+	}
+
+	return files, nil
+}
+
+func ReadYAMLFiles(f string) (map[string][]yaml.Node, error) {
+	files, err := FindFiles(f)
+	if err != nil {
+		return nil, err
 	}
 
 	res := map[string][]yaml.Node{}

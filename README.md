@@ -366,6 +366,42 @@ $ flux-repo read outdir | kubectl apply -f -
 
 `flux-repo` supports [mozilla/sops](https://github.com/mozilla/sops) with AWS KMS as the backend.
 
+It has two modes of operation:
+
+- [Filter mode](#filter-mode)
+- [Sanitizing mode](#sanitizing-mode)
+
+#### Filter mode
+
+The filter mode is specific to the SOPS backend and not available in other backends.
+
+In this mode, `flux-repo` reads files in the input directory encrypt `data` and `stringData` contained in YAML files whose `kind` is `Secret`.
+
+As the backend name says, it uses `sops` for encryption, saving the result into the output directory. Other files are copied as-is, without running `sops`.
+
+The resulting output directory can be consumed by `flux` without any custom configuration via [flux's native SOPS support](https://github.com/fluxcd/flux/pull/2580).
+
+To enable this mode, you must run `flux-repo write` with `-encrypt`.
+
+For example, running:
+
+```
+flux-repo write \
+  -encrypt \
+  -b sops \
+  -aws-kms-key-arn arn:aws:kms:REGION:ACCOUNT_ID:key/foo/bar \
+  -f indir/ \
+  -o outdir/
+```
+
+will basically run `SOPS_KMS_ARN=arn:aws:kms:REGION:ACCOUNT_ID:key/foo/bar sops -e indir/FILE > outdir/FILE` for every file contained in the input directory.
+
+> Note that `FILE` is the path to the file relative to the input directory.
+
+#### Sanitizing mode
+
+In contrast to the filter mode, this one works similar to other backends, replacing every occurrence of secret value with its reefrences, saving the original secret values into a sops-encrypted file.
+
 Let's say your Kubernetes manifests had an input file named `indir/example.yaml` which contains cleartext secret values:
 
 ```

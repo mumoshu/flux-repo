@@ -21,6 +21,8 @@ type Sops struct {
 	KMS               string
 	EncryptionContext string
 	AWSProfile        string
+	EncryptedRegex    string
+	EncryptedSuffix   string
 }
 
 // File is a wrapper around Data that reads a local cleartext
@@ -84,13 +86,13 @@ func (sp *Sops) Data(path string, data []byte, format string) (cleartext []byte,
 	tree := sops.Tree{
 		Branches: branches,
 		Metadata: sops.Metadata{
-			KeyGroups:         []sops.KeyGroup{keyGroup},
-			UnencryptedSuffix: "__unenc",
+			KeyGroups:      []sops.KeyGroup{keyGroup},
+			EncryptedRegex: sp.EncryptedRegex,
 			// This is set to non-empty when and only when you need opt-in for encryption
 			// In other words, you must omit this if you wanna encrypt everything in the data
-			EncryptedSuffix:   "",
-			Version:           version.Version,
-			ShamirThreshold:   0,
+			EncryptedSuffix: sp.EncryptedSuffix,
+			Version:         version.Version,
+			ShamirThreshold: 0,
 		},
 		FilePath: absPath,
 	}
