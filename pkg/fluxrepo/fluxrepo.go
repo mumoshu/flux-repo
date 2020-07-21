@@ -35,7 +35,7 @@ func RestoreSecrets(r *vals.Runtime, node yaml.Node) (*yaml.Node, error) {
 			isSecret = true
 		}
 
-		if isSecret && k.Value == "stringData" {
+		if k.Value == "stringData" {
 			ii = i
 			kk = *k
 			vv = *v
@@ -92,7 +92,7 @@ func SanitizeSecrets(secrets *SecretProvider, node yaml.Node, add bool) (*yaml.N
 
 	var ns, name string
 
-	var isData, isStringData bool
+	var hasData, isStringData bool
 
 	isSecret := false
 	mappings := node.Content[0].Content
@@ -120,15 +120,15 @@ func SanitizeSecrets(secrets *SecretProvider, node yaml.Node, add bool) (*yaml.N
 			}
 		}
 
-		if isSecret && k.Value == "data" {
+		if k.Value == "data" {
 			ii = i
 			kk = *k
 			vv = *v
 
-			isData = true
+			hasData = true
 		}
 
-		if isSecret && k.Value == "stringData" {
+		if k.Value == "stringData" {
 			ii = i
 			kk = *k
 			vv = *v
@@ -154,7 +154,7 @@ func SanitizeSecrets(secrets *SecretProvider, node yaml.Node, add bool) (*yaml.N
 
 			var origValue string
 
-			if isData {
+			if hasData {
 				bs, err := ioutil.ReadAll(base64.NewDecoder(base64.StdEncoding, strings.NewReader(rawOrigValue)))
 				if err != nil {
 					return nil, fmt.Errorf("uenxpected error while decoding base64-encded secret data field: %w", err)
